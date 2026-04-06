@@ -7,7 +7,7 @@ type testDoc struct {
 	Age  int    `json:"age"`
 }
 
-func newTestCollection(t *testing.T, maxObjects, maxBytes int, name string) *Collection {
+func newTestCollection(t *testing.T, maxBytes, maxObjects int, name string) *Collection {
 	t.Helper()
 	withTempWorkingDir(t)
 
@@ -22,20 +22,20 @@ func TestCollectionSetAndGetFromCache(t *testing.T) {
 	col := newTestCollection(t, 100, 1024, "users")
 
 	want := testDoc{Name: "alice", Age: 30}
-	if err := col.Set("u1", want); err != nil {
+	if err := col.Set("u1", want, "name", "age"); err != nil {
 		t.Fatalf("Set failed: %v", err)
 	}
 
-	if err := col.Collection().Delete("u1"); err != nil {
-		t.Fatalf("Delete in underlying db failed: %v", err)
-	}
-
 	var got testDoc
-	if err := col.Get("u1", &got); err != nil {
+	if err := col.Get("alice", &got); err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
 	if got != want {
 		t.Fatalf("unexpected value: got %+v want %+v", got, want)
+	}
+
+	if err := col.Delete("u1"); err != nil {
+		t.Fatalf("Delete in underlying db failed: %v", err)
 	}
 }
 
@@ -119,6 +119,54 @@ func TestCollectionExistsUsesCache(t *testing.T) {
 
 	if !col.Exists("u1") {
 		t.Fatal("expected Exists to return true from cache")
+	}
+}
+
+func TestCollectionAccessorsAndCacheManagement(t *testing.T) {
+	col := newTestCollection(t, 1024, 100, "users")
+
+	if col.Name() != "users" {
+		t.Fatalf("unexpected name: %s", col.Name())
+	}
+	if col.String() != "Collection: users" {
+		t.Fatalf("unexpected String output: %s", col.String())
+	}
+	if col.DB() == nil {
+		t.Fatal("expected DB accessor to return the underlying db")
+	}
+	if col.Collection() == nil {
+		t.Fatal("expected Collection accessor to return the underlying collection")
+	}
+	if col.Cache() == nil {
+		t.Fatal("expected Cache accessor to return the cache")
+	}
+
+	if err := col.Set("u1", testDoc{Name: "alice", Age: 30}); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+	if got := col.Len(); got != 1 {
+		t.Fatalf("unexpected collection length: got %d want 1", got)
+	}
+
+	originalCache := col.Cache()
+	col.SetCache(nil)
+	if col.Cache() != originalCache {
+		t.Fatal("expected SetCache(nil) to keep the existing cache")
+	}
+
+	replacement := NewCollectionCache(5, 64)
+	col.SetCache(replacement)
+	if col.Cache() != replacement {
+		t.Fatal("expected SetCache to replace the cache instance")
+	}
+
+	col.Cache().Set("temp", []byte(`{"name":"cached"}`))
+	col.Clear()
+	if _, ok := col.Cache().Get("temp"); ok {
+		t.Fatal("expected Clear to purge the cache")
+	}
+	if _, err := col.Collection().Get("u1"); err != nil {
+		t.Fatalf("expected Clear to leave persisted data intact: %v", err)
 	}
 }
 

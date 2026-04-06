@@ -5,6 +5,14 @@ import (
 	"testing"
 )
 
+func TestCollectionCacheCalcSize(t *testing.T) {
+	cache := NewCollectionCache(10, 1024)
+
+	if size := cache.CalcSize("ab", []byte("123")); size != 5 {
+		t.Fatalf("unexpected size: got %d want 5", size)
+	}
+}
+
 func TestCollectionCacheSetGetClonesBytes(t *testing.T) {
 	cache := NewCollectionCache(10, 1024)
 	in := []byte("value")
@@ -79,6 +87,27 @@ func TestCollectionCacheOversizedItemIsRejectedAndReplacesExisting(t *testing.T)
 	}
 }
 
+func TestCollectionCacheSetUpdatesExistingEntry(t *testing.T) {
+	cache := NewCollectionCache(10, 1024)
+	cache.Set("k", []byte("1"))
+	cache.Set("k", []byte("22"))
+
+	if len(cache.items) != 1 {
+		t.Fatalf("expected a single cache entry, got %d", len(cache.items))
+	}
+	if cache.currentBytes != len("k")+len("22") {
+		t.Fatalf("unexpected byte count: got %d", cache.currentBytes)
+	}
+
+	out, ok := cache.Get("k")
+	if !ok {
+		t.Fatal("expected updated key to exist")
+	}
+	if string(out) != "22" {
+		t.Fatalf("unexpected updated value: %q", string(out))
+	}
+}
+
 func TestCollectionCacheWarmAndGetAllIfComplete(t *testing.T) {
 	cache := NewCollectionCache(10, 1024)
 	source := map[string][]byte{
@@ -124,6 +153,24 @@ func TestCollectionCacheWarmIncompleteWhenEvictedOrOversized(t *testing.T) {
 	cache2.Warm(map[string][]byte{"big": []byte("1234")})
 	if _, ok := cache2.GetAllIfComplete(); ok {
 		t.Fatal("expected incomplete snapshot when warm-up skips oversized item")
+	}
+}
+
+func TestCollectionCacheWarmReplacesExistingState(t *testing.T) {
+	cache := NewCollectionCache(10, 1024)
+	cache.Set("stale", []byte("x"))
+
+	cache.Warm(map[string][]byte{"fresh": []byte("y")})
+
+	if _, ok := cache.Get("stale"); ok {
+		t.Fatal("expected warm-up to purge stale entries first")
+	}
+	all, ok := cache.GetAllIfComplete()
+	if !ok {
+		t.Fatal("expected a complete snapshot after warm-up")
+	}
+	if len(all) != 1 || string(all["fresh"]) != "y" {
+		t.Fatalf("unexpected warmed snapshot: %+v", all)
 	}
 }
 
