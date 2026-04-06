@@ -1,4 +1,4 @@
-module github.com/anare/simple-json-db-cache
+module github.com/anare/filejsondb
 
 go 1.26.1
 

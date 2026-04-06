@@ -1,4 +1,4 @@
-package simple_json_db_cache
+package filejsondb
 
 import "testing"
 
@@ -27,7 +27,7 @@ func TestCollectionSetAndGetFromCache(t *testing.T) {
 	}
 
 	var got testDoc
-	if err := col.Get("alice", &got); err != nil {
+	if err := col.Get("u1", &got); err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
 	if got != want {
@@ -144,7 +144,7 @@ func TestCollectionAccessorsAndCacheManagement(t *testing.T) {
 	if err := col.Set("u1", testDoc{Name: "alice", Age: 30}); err != nil {
 		t.Fatalf("Set failed: %v", err)
 	}
-	if got := col.Len(); got != 1 {
+	if got := col.Len(); got != 2 {
 		t.Fatalf("unexpected collection length: got %d want 1", got)
 	}
 

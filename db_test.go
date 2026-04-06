@@ -1,4 +1,4 @@
-package simple_json_db_cache
+package filejsondb
 
 import "testing"
 

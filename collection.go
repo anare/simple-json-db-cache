@@ -1,4 +1,4 @@
-package simple_json_db_cache
+package filejsondb
 
 import (
 	"encoding/json"
@@ -129,7 +129,12 @@ func (c *Collection) LoadIndexes(id string) (idx string, indexes map[string]inte
 	var rawIndex []byte
 	rawIndex, err = c.collection.Get(idx)
 	if err != nil {
-		return idx, nil, err
+		id = uuid.Id(id)
+		idx = fmt.Sprintf("%s.idx", id)
+		rawIndex, err = c.collection.Get(idx)
+		if err != nil {
+			return idx, nil, err
+		}
 	}
 
 	err = json.Unmarshal(rawIndex, &indexes)
@@ -207,6 +212,14 @@ func (c *Collection) AddIndex(id string, value interface{}, indexes ...string) (
 	}
 	if existsIndexes == nil {
 		existsIndexes = make(map[string]interface{})
+	}
+	idhash := uuid.Id(id)
+	existsIndexes[idhash] = map[string]interface{}{
+		"id":    id,
+		"value": id,
+		"hash":  idhash,
+		"index": "id",
+		"type":  "string",
 	}
 	c.hashIndexes(id, value, &existsIndexes, indexes...)
 
